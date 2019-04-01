@@ -1,0 +1,25 @@
+name: Hub
+version: 1.0.0
+description: Hub
+depend: [ParadiseCore, ProtocolLib, ViaVersion]
+main: me.chasertw123.minigames.hub.Main
+
+commands:
+  Fly:
+    description: Toggles ability to fly in the hub.
+    aliases: []
+  Profile:
+    description: Used to look up all info on a player's account.
+    aliases: [prof, lookup, look_up]
+  ServerSelector:
+    description: Opens up server selector gui.
+    aliases: [ss, selector]
+  SetSpawnpoint:
+    description: SetSpawnpoint command
+    aliases: []
+  Shop:
+    description: Shop Command
+    aliases: []
+  Warp:
+    description: Warp command
+    aliases: []
