@@ -1,5 +1,6 @@
 package me.chasertw123.minigames.hub.user;
 
+import com.mongodb.client.MongoCollection;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.UpdateOptions;
 import com.mongodb.client.result.UpdateResult;
@@ -10,7 +11,7 @@ import me.chasertw123.minigames.core.collectibles.CollectibleManager;
 import me.chasertw123.minigames.core.collectibles.gadgets.GadgetCollectible;
 import me.chasertw123.minigames.core.collectibles.morphs.MorphCollectible;
 import me.chasertw123.minigames.core.collectibles.particles.ParticleCollectible;
-import me.chasertw123.minigames.core.database.NoSQLDatabase;
+import me.chasertw123.minigames.core.database.GenericDatabaseMethods;
 import me.chasertw123.minigames.core.user.data.settings.Setting;
 import me.chasertw123.minigames.core.utils.items.AbstractItem;
 import me.chasertw123.minigames.core.utils.items.Items;
@@ -18,6 +19,7 @@ import me.chasertw123.minigames.hub.Main;
 import me.chasertw123.minigames.hub.features.guis.collectibles.joinmessages.LoginMessage;
 import me.chasertw123.minigames.hub.features.parkour.UserCourseCompletionData;
 import me.chasertw123.minigames.hub.user.data.WaterWarsUserData;
+import me.chasertw123.minigames.shared.database.Database;
 import me.chasertw123.minigames.shared.framework.ServerGameType;
 import org.bson.Document;
 import org.bukkit.Bukkit;
@@ -26,7 +28,9 @@ import org.bukkit.Sound;
 import org.bukkit.entity.Player;
 import org.bukkit.potion.PotionEffect;
 import org.bukkit.potion.PotionEffectType;
+import sun.net.www.content.text.Generic;
 
+import javax.print.Doc;
 import java.util.*;
 
 /**
@@ -57,19 +61,25 @@ public class User {
         Main.newChain()
                 .asyncFirst(() ->  {
 
-                    Map<String, Document> documents = new HashMap<>();
-                    if (NoSQLDatabase.getNoSQLDatabase().containsUser(NoSQLDatabase.getNoSQLDatabase().getCollection(NoSQLDatabase.HUB_COLLECTION_ID), uuid))
-                        documents.put(NoSQLDatabase.HUB_COLLECTION_ID, NoSQLDatabase.getNoSQLDatabase().getCollection(NoSQLDatabase.HUB_COLLECTION_ID).find(Filters.eq("uuid", uuid.toString())).first());
+                    Database database = CoreAPI.getDatabase();
+                    MongoCollection<Document> hubCollection = database.getMongoCollection(Database.Collection.HUB_USER),
+                            waterWarsCollection = database.getMongoCollection(ServerGameType.WATER_WARS);
 
-                    if (NoSQLDatabase.getNoSQLDatabase().containsUser(NoSQLDatabase.getNoSQLDatabase().getCollection(ServerGameType.WATER_WARS), uuid))
-                        documents.put(ServerGameType.WATER_WARS.toString(), NoSQLDatabase.getNoSQLDatabase().getCollection(ServerGameType.WATER_WARS).find(Filters.eq("uuid", uuid.toString())).first());
+                    Map<String, Document> documents = new HashMap<>();
+                    if (GenericDatabaseMethods.containsUser(hubCollection, uuid))
+                        documents.put(Database.Collection.HUB_USER.getId(),
+                                hubCollection.find(Filters.eq("uuid", uuid.toString())).first());
+
+                    if (GenericDatabaseMethods.containsUser(waterWarsCollection, uuid))
+                        documents.put(ServerGameType.WATER_WARS.toString(),
+                                waterWarsCollection.find(Filters.eq("uuid", uuid.toString())).first());
 
                     return documents;
                 })
                 .syncLast((documents) -> {
 
                     CollectibleManager cm = me.chasertw123.minigames.core.Main.getCollectibleManager();
-                    Document hubData = documents.getOrDefault(NoSQLDatabase.HUB_COLLECTION_ID, null);
+                    Document hubData = documents.getOrDefault(Database.Collection.HUB_USER.getId(), null);
                     if (hubData != null) {
 
                         this.unlockedCollectibles = cm.getUnlockedCollectibles((Document) hubData.get("unlocks"), getCoreUser());
@@ -281,8 +291,13 @@ public class User {
         this.parkourCourseData.forEach(parkourData::put);
         hubData.put("parkour", parkourData);
 
-        UpdateResult result1 = NoSQLDatabase.getNoSQLDatabase().getCollection(NoSQLDatabase.HUB_COLLECTION_ID).replaceOne(Filters.eq("uuid", uuid.toString()), hubData, new UpdateOptions().upsert(true));
-        UpdateResult result2 = NoSQLDatabase.getNoSQLDatabase().getCollection(ServerGameType.WATER_WARS).replaceOne(Filters.eq("uuid", uuid.toString()), wwData, new UpdateOptions().upsert(true));
+        Database database = CoreAPI.getDatabase();
+
+        UpdateResult result1 = database.getMongoCollection(Database.Collection.HUB_USER)
+                .replaceOne(Filters.eq("uuid", uuid.toString()), hubData, Database.upsert());
+
+        UpdateResult result2 = database.getMongoCollection(ServerGameType.WATER_WARS)
+                .replaceOne(Filters.eq("uuid", uuid.toString()), wwData, Database.upsert());
 
         return result1.getModifiedCount() >= result1.getMatchedCount() && result2.getModifiedCount() >= result2.getMatchedCount();
     }
